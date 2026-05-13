@@ -1,6 +1,5 @@
 import fs from 'fs';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { HNSWLib } from '@langchain/community/vectorstores/hnswlib';
 import { HuggingFaceTransformersEmbeddings } from '@langchain/community/embeddings/huggingface_transformers';
 import { ChatGroq } from '@langchain/groq';
 import { createRequire } from 'module';
@@ -9,6 +8,67 @@ const pdfParse = require('pdf-parse');
 import csvParser from 'csv-parser';
 import { Document } from '@langchain/core/documents';
 import { PromptTemplate } from '@langchain/core/prompts';
+import { VectorStore } from '@langchain/core/vectorstores';
+
+function cosineSimilarity(vecA, vecB) {
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < vecA.length; i++) {
+        dotProduct += vecA[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
+        normB += vecB[i] * vecB[i];
+    }
+    if (normA === 0 || normB === 0) return 0;
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+class SimpleMemoryVectorStore extends VectorStore {
+    constructor(embeddings, args = {}) {
+        super(embeddings, args);
+        this.memoryVectors = [];
+    }
+
+    _vectorstoreType() {
+        return "memory";
+    }
+
+    async addDocuments(documents) {
+        const texts = documents.map(({ pageContent }) => pageContent);
+        const vectors = await this.embeddings.embedDocuments(texts);
+        
+        const memoryVectors = vectors.map((embedding, idx) => ({
+            content: documents[idx].pageContent,
+            embedding,
+            metadata: documents[idx].metadata,
+        }));
+
+        this.memoryVectors = this.memoryVectors.concat(memoryVectors);
+    }
+
+    async addVectors(vectors, documents) {}
+
+    async similaritySearchVectorWithScore(query, k, filter) {
+        const results = this.memoryVectors.map((vector) => {
+            return [
+                new Document({
+                    pageContent: vector.content,
+                    metadata: vector.metadata,
+                }),
+                cosineSimilarity(query, vector.embedding)
+            ];
+        });
+
+        results.sort((a, b) => b[1] - a[1]);
+        return results.slice(0, k);
+    }
+
+    static async fromDocuments(docs, embeddings) {
+        const instance = new SimpleMemoryVectorStore(embeddings);
+        await instance.addDocuments(docs);
+        return instance;
+    }
+}
 
 // Initialize Global Stores
 let vectorStore;
@@ -76,7 +136,7 @@ export const processDocument = async (filePath, mimetype) => {
 
         // Embed and Store in Vector DB
         if (!isVectorStoreInitialized) {
-            vectorStore = await HNSWLib.fromDocuments(docs, embeddings);
+            vectorStore = await SimpleMemoryVectorStore.fromDocuments(docs, embeddings);
             isVectorStoreInitialized = true;
         } else {
             await vectorStore.addDocuments(docs);
