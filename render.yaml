@@ -2,7 +2,7 @@ services:
   - type: web
     name: notebookllm-clone
     env: node
-    buildCommand: cd backend && npm install
+    buildCommand: cd backend && npm install --legacy-peer-deps
     startCommand: cd backend && npm start
     envVars:
       - key: NODE_VERSION
