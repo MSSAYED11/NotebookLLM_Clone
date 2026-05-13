@@ -3,9 +3,7 @@ import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { HNSWLib } from '@langchain/community/vectorstores/hnswlib';
 import { HuggingFaceTransformersEmbeddings } from '@langchain/community/embeddings/huggingface_transformers';
 import { ChatGroq } from '@langchain/groq';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import csvParser from 'csv-parser';
 import { Document } from '@langchain/core/documents';
 import { PromptTemplate } from '@langchain/core/prompts';
@@ -55,9 +53,9 @@ export const processDocument = async (filePath, mimetype) => {
 
     try {
         if (mimetype === 'application/pdf') {
-            const dataBuffer = fs.readFileSync(filePath);
-            const data = await pdfParse(dataBuffer);
-            text = data.text;
+            const loader = new PDFLoader(filePath);
+            const loadedDocs = await loader.load();
+            text = loadedDocs.map(doc => doc.pageContent).join('\n');
         } else if (mimetype === 'text/csv') {
             text = await processCSV(filePath);
         } else if (mimetype === 'text/plain') {
