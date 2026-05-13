@@ -2,9 +2,7 @@ import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 
-// In production, this should point to your deployed backend URL (Render)
-// For local development, it points to localhost:5000
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://notebookllm-clone-3l9t.onrender.com' : 'http://localhost:5000');
 
 function App() {
   const [sources, setSources] = useState([]);
