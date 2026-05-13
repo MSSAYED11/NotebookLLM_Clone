@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: notebookllm-clone
+    env: node
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.x
+      - key: GROQ_API_KEY
+        sync: false
